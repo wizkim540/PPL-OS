@@ -5,11 +5,12 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 
 public class Interpreter {
 
     private static String[] memoryHex = null;
-    private static String inProcessAddressCode = null;
+    private static String inProcessCode = null;
     
 	/**
 	 * Interpret address code from its path and write the machine code to machine code file (in hexadecimal).
@@ -26,9 +27,9 @@ public class Interpreter {
 			readFile = new BufferedReader(new FileReader(addressCodeFilePathName));
 			writeFile = new BufferedWriter(new FileWriter(machineCodeFilePathName));
 			
-			while((inProcessAddressCode = readFile.readLine()) != null) {
-			    if(inProcessAddressCode.trim().equals("")) continue;
-			    writeFile.append("0x" + interpret(inProcessAddressCode));
+			while((inProcessCode = readFile.readLine()) != null) {
+			    if(inProcessCode.trim().equals("")) continue;
+			    writeFile.append("0x" + interpret(inProcessCode));
                 writeFile.newLine();
             }
 		} catch (FileNotFoundException e) {
@@ -68,9 +69,9 @@ public class Interpreter {
             readFile = new BufferedReader(new FileReader(addressCodeFilePathName));
             writeFile = new BufferedWriter(new FileWriter(machineCodeFilePathName));
             
-            while((inProcessAddressCode = readFile.readLine()) != null) {
-                if(inProcessAddressCode.trim().equals("")) continue;
-                writeFile.append("" + Integer.parseInt(interpret(inProcessAddressCode), 16));
+            while((inProcessCode = readFile.readLine()) != null) {
+                if(inProcessCode.trim().equals("")) continue;
+                writeFile.append("" + Integer.parseInt(interpret(inProcessCode), 16));
                 writeFile.newLine();
             }
         } catch (FileNotFoundException e) {
@@ -79,6 +80,80 @@ public class Interpreter {
         } catch (IOException e) {
             System.out.println("Error - Machine Code file can not be made");
             System.out.println(machineCodeFilePathName);
+        } finally {
+            try {
+                readFile.close();
+            } catch (IOException e) {
+                System.out.println("Failed to do close() on BufferedReader");
+            }
+
+            try {
+                writeFile.close();
+            } catch (IOException e) {
+                System.out.println("Failed to do close() on BufferedWriter");
+            }
+        }
+        return true;
+    }
+    
+    public static boolean assemblyToAddressCode(String assemblyCodeFilePath, String addressCodeFilePath) {
+        BufferedReader readFile = null;
+        BufferedWriter writeFile = null;
+        ArrayList<String> label = null;
+        ArrayList<Integer> lineOfLabel = null;
+        int lineNumber = 0;
+        
+        try {
+            readFile = new BufferedReader(new FileReader(assemblyCodeFilePath));
+            writeFile = new BufferedWriter(new FileWriter(addressCodeFilePath));
+            label = new ArrayList<String>();
+            lineOfLabel = new ArrayList<Integer>();
+            
+            while((inProcessCode = readFile.readLine()) != null) {
+                if(inProcessCode.trim().equals("")) continue;
+                inProcessCode = inProcessCode.trim();
+                if(inProcessCode.charAt(inProcessCode.indexOf(' ')-1) == ':') {
+                    label.add(inProcessCode.substring(0, inProcessCode.indexOf(' ')-1));
+                    lineOfLabel.add(new Integer(lineNumber));
+                }
+                lineNumber++;
+            }
+            
+            readFile.close();
+            readFile = new BufferedReader(new FileReader(assemblyCodeFilePath));
+            String str;
+            while((inProcessCode = readFile.readLine()) != null) {
+                if(inProcessCode.trim().equals("")) continue;
+                inProcessCode = inProcessCode.trim();
+                if(inProcessCode.indexOf(' ') >= 0 && inProcessCode.charAt(inProcessCode.indexOf(' ')-1) == ':') {
+                    inProcessCode = inProcessCode.substring(inProcessCode.indexOf(' ')+1);
+                }
+                if(inProcessCode.indexOf(' ') >= 0) {
+                    switch(inProcessCode.substring(0, inProcessCode.indexOf(' ')).toUpperCase())
+                    {
+                        case "JMP":
+                        case "JLT":
+                        case "JGT":
+                        case "JE":
+                        case "JNE":
+                            str = inProcessCode.substring(inProcessCode.lastIndexOf(' ')+1);
+                            if(label.contains(str)) {
+                                inProcessCode = inProcessCode.replace(str, 
+                                        Integer.toString(lineOfLabel.get(label.indexOf(str))*4));
+                            }
+                        default: break;
+                    }
+                }
+                writeFile.append(inProcessCode);
+                writeFile.newLine();
+                writeFile.flush();
+            }
+        } catch (FileNotFoundException e) {
+            System.out.println("Error - Assembly Code file not found");
+            System.out.println(assemblyCodeFilePath);
+        } catch (IOException e) {
+            System.out.println("Error - Address Code file can not be made / fail to do close()");
+            System.out.println(addressCodeFilePath);
         } finally {
             try {
                 readFile.close();
